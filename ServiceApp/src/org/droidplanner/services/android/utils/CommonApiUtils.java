@@ -537,11 +537,9 @@ public class CommonApiUtils {
     }
 
     public static void disableFollowMe(Follow follow) {
-        if (follow == null)
-            return;
-
-        if (follow.isEnabled())
-            follow.toggleFollowMeState();
+        if(follow != null) {
+            follow.disableFollowMe();
+        }
     }
 
     public static void triggerCamera(MavLinkDrone drone) {
@@ -826,6 +824,34 @@ public class CommonApiUtils {
             } catch (Exception e) {
                 Timber.e(e, e.getMessage());
             }
+        }
+    }
+
+    public static void sendLookAtTarget(final MavLinkDrone drone, final LatLongAlt target, final boolean force, final ICommandListener listener){
+        if(drone == null)
+            return;
+
+        GuidedPoint guidedPoint = drone.getGuidedPoint();
+        if(guidedPoint.isInitialized()){
+            MavLinkDoCmds.setROI(drone, target, listener);
+        }
+        else if (force) {
+            GuidedPoint.changeToGuidedMode(drone, new AbstractCommandListener() {
+                @Override
+                public void onSuccess() {
+                    MavLinkDoCmds.setROI(drone, target, listener);
+                }
+
+                @Override
+                public void onError(int executionError) {
+                    postErrorEvent(executionError, listener);
+                }
+
+                @Override
+                public void onTimeout() {
+                    postTimeoutEvent(listener);
+                }
+            });
         }
     }
 

@@ -70,7 +70,7 @@ public class ReturnToMe implements DroneInterfaces.OnDroneListener<MavLinkDrone>
 
             //Enable return to me
             Timber.i("Enabling return to me.");
-            locationFinder.enableLocationUpdates();
+            locationFinder.enableLocationUpdates(TAG, this);
             updateCurrentState(ReturnToMeState.STATE_WAITING_FOR_VEHICLE_GPS);
         }
     }
@@ -79,9 +79,33 @@ public class ReturnToMe implements DroneInterfaces.OnDroneListener<MavLinkDrone>
         if (isEnabled.compareAndSet(true, false)) {
             //Disable return to me
             Timber.i("Disabling return to me.");
-            locationFinder.disableLocationUpdates();
+            locationFinder.disableLocationUpdates(TAG);
 
             currentState.setCurrentHomeLocation(null);
+
+            //Reset the original home location
+            final LatLongAlt originalHomeLocation = currentState.getOriginalHomeLocation();
+            if(originalHomeLocation != null){
+                MavLinkDoCmds.setVehicleHome(droneMgr.getDrone(), originalHomeLocation, new AbstractCommandListener(){
+
+                    @Override
+                    public void onSuccess() {
+                        Timber.i("Updated vehicle home location to %s", originalHomeLocation.toString());
+                        droneMgr.getDrone().executeAsyncAction(requestHomeUpdateAction, null);
+                    }
+
+                    @Override
+                    public void onError(int executionError) {
+                        Timber.e("Unable to update vehicle home location: %d", executionError);
+                    }
+
+                    @Override
+                    public void onTimeout() {
+                        Timber.w("Vehicle home update timed out!");
+                    }
+                });
+            }
+
             updateCurrentState(ReturnToMeState.STATE_IDLE);
 
             this.commandListener = null;
@@ -124,7 +148,6 @@ public class ReturnToMe implements DroneInterfaces.OnDroneListener<MavLinkDrone>
                                 Timber.e("Unable to update vehicle home location: %d", executionError);
                                 CommonApiUtils.postErrorEvent(executionError, commandListener);
                                 updateCurrentState(ReturnToMeState.STATE_ERROR_UPDATING_HOME);
-
                             }
 
                             @Override
